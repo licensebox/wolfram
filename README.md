@@ -37,7 +37,7 @@ Explicitly sign in using the sign-in method when the user chooses to activate. R
 
 ## API
 
-`LicenseboxLease`, `LicenseboxRequire`, `LicenseboxStatus`, `LicenseboxSignIn`, `LicenseboxLogout`, `LicenseboxModules`, `LicenseboxRequests`, `LicenseboxRequestAccess`, `LicenseboxAccessLink`, `LicenseboxRecord`, `LicenseboxDeriveBinding`, `LicenseboxNativeBinding`, `LicenseboxVerifyLease`. Failures return Failure[code, association].
+`LicenseboxLease`, `LicenseboxHeartbeat`, `LicenseboxRequire`, `LicenseboxStatus`, `LicenseboxSignIn`, `LicenseboxLogout`, `LicenseboxModules`, `LicenseboxRequests`, `LicenseboxRequestAccess`, `LicenseboxAccessLink`, `LicenseboxRecord`, `LicenseboxDeriveBinding`, `LicenseboxNativeBinding`, `LicenseboxVerifyLease`. Failures return Failure[code, association].
 
 Constructor options include version, server, directory and optional ca_bundle. TLS certificate and hostname verification stay enabled. The sign-in callback receives the verification URL and user code. Clock, machine binding and cancellation are **typed trusted application callbacks**, not JSON option overrides or end-user settings. Callback state stays alive for the native client's lifetime. Exceptions are contained at the FFI boundary and reported after native execution. Callbacks must not reenter the client; the wrapper rejects reentry. Calls and error inspection are serialized; do not move language runtime handles between unsupported threads.
 
@@ -45,7 +45,7 @@ Access links, leases and private device codes are credentials; avoid logs. Keep 
 
 ## Validation
 
-Actual Wolfram Engine 15.0.0 on Linux x86-64 passes all 69 shared checks, TLS trust/hostname tests, the installed-package consumer, 100-client lifecycle checks, Unicode JSON roundtrips and real sign-in/cancellation callbacks. Each shared adapter request starts a fresh Wolfram process and executes the actual Wolfram API/JLink/native stack. All fixtures and servers are synthetic; no production endpoint or private product data is used.
+Actual Wolfram Engine 15.0.0 on Linux x86-64 passes all 69 shared checks, TLS trust/hostname tests, the installed-package consumer, 100-client lifecycle checks, Unicode JSON roundtrips and real sign-in/cancellation callbacks. Each shared adapter request starts a fresh Wolfram process and executes the actual Wolfram API/JLink/native stack. The heartbeat feature candidate also passes all 36 shared heartbeat checks, including missing-identity refusal and HTTP redirect refusal. All fixtures and servers are synthetic; no production endpoint or private product data is used.
 
 The exact public protocol pin is protocol-lock.json; native-version.txt records the minimum C release. Follow [the shared contract](https://github.com/licensebox/protocol) before changing licensing behavior. Administration remains in the Go CLI.
 
@@ -53,3 +53,11 @@ The scheduled update workflow tests only the bridge before proposing native
 dependency/contract updates. Its PRs retain the bridge-only validation profile; they do not prove a new dependency passes Wolfram runtime checks. Run `ci/full-test.sh` on an already activated runner before promoting any preview/dependency update to a released SDK.
 
 The [official Wolfram CI template](https://github.com/WolframResearch/WL-FunctionCompile-CI-Template#2-create-an-on-demand-license-entitlement) uses an on-demand licensing entitlement stored as a repository secret, or a licensed self-hosted/MathLM setup. A public repository alone does not provide automatic Wolfram activation. This project has not configured a licensed hosted runtime job and does not copy local activation files or credentials into the repository.
+
+## Optional explicit heartbeat
+
+Use `LicenseboxHeartbeat[client, "core"]` for an explicit bounded renewal/checkpoint. The mandatory module must be nonempty. The result contains `lease` (the complete verified lease, preserving optional signed `heartbeat.interval_seconds`/`grace_seconds`) and `online` (whether this check renewed successfully online). Every invocation attempts renewal, including after a cached `Require`; it never starts interactive activation or transfers a seat. Eligible outages may return `online=false` only while the last verified signed lease remains unexpired. Refusals, missing modules and expired offline access remain errors.
+
+Default Client/Lease/Require behavior is unchanged. No timer, task, thread or background heartbeat starts automatically. The application owns event-loop scheduling/checkpoints on the language runtime thread, and safe cancellation of protected work on refusal or the last verified expiry deadline. A failed check cannot extend that deadline. This is especially important for MATLAB, Wolfram/JLink and other runtimes whose callbacks must stay on their owning thread. The matching native C heartbeat API/contract is required.
+
+Validate the feature against the candidate native core with `python3 ../protocol/conformance/heartbeat.py --adapter bash ci/adapter.sh` in addition to the existing full shared suite.

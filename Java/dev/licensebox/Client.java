@@ -111,6 +111,8 @@ public class Client implements AutoCloseable {
         } finally {busy=false;Reference.reachabilityFence(this);}
     }
     public JsonElement lease(){return call("lease",new JsonObject());}
+    /** Explicit bounded renewal, never interactive sign-in. No scheduler is started. */
+    public JsonElement heartbeat(String module){JsonObject args=new JsonObject();args.addProperty("module",argument(module));return call("heartbeat",args);}
     public JsonElement require(String module){JsonObject args=new JsonObject();args.addProperty("module",argument(module));return call("require",args);}
     public JsonElement status(){return call("status",new JsonObject());}
     public JsonElement signIn(){return signIn(0);}

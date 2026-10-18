@@ -67,3 +67,33 @@ updates. The official Wolfram CI template requires an on-demand entitlement
 secret or a licensed self-hosted/MathLM configuration; the existing public job
 proves only the bridge profile. No licensing credentials or activation changes
 were made during this validation, and no remote release/tag was published.
+
+## Optional heartbeat candidate — 2026-10-18
+
+The separate `feature/heartbeat` branch additionally passes all **36 shared
+heartbeat cases** through actual Wolfram Engine 15/JLink/native execution. The
+complete 69-case suite was rerun successfully against the same corrected native
+C candidate `c530e36b4656d9a66cb1b01c977a84df1f458fc3`. The shared regression
+comes from protocol commit `e1f44de9fac558889e30e02bc033485917c7d0ce`;
+`conformance/heartbeat.py` has SHA256
+`d654e6be89d18f8b8b41f54b4472d134c365af77f723ad7de669ab447ee7f793`.
+
+The installed executable-package consumer also invokes the new public
+`LicenseboxHeartbeat` method and checks missing-lease and closed-client refusal.
+The existing runtime, package, callback, Unicode and TLS checks passed during
+candidate validation. Logs are retained locally as `build/logs/heartbeat.log`
+and `build/logs/conformance-c530e36.log`, with earlier 34-case evidence retained
+separately; no raw logs, tests or documentation are included in executable
+packages.
+
+The primitive preserves the optional verified signed policy and returns the
+complete lease plus the `online` result. The shared cases exercise forced contact
+on repeated calls and after cached Require, offline deadlines, removed modules,
+persisted refusals, terms, revocation, missing identity without creating a new
+key, and refusal of an HTTP redirect without forwarding signed credentials.
+No automatic timer, runtime thread, sign-in or monitor starts. Applications own
+scheduling and safe cancellation on their runtime thread.
+
+This local evidence does not promote the source preview or establish licensed
+hosted CI. The existing GitHub profile remains bridge only; a stable release
+still requires repeatable licensed runtime CI.

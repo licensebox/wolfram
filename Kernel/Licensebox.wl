@@ -1,6 +1,7 @@
 BeginPackage["Licensebox`"];
 LicenseboxOpen::usage="LicenseboxOpen[options, callbacks] creates a native licensing client. callbacks are trusted functions keyed by on_sign_in, clock, machine_binding, cancelled.";
 LicenseboxClose::usage="LicenseboxClose[client] releases native resources.";
+LicenseboxHeartbeat::usage="LicenseboxHeartbeat[client,module] explicitly renews without activation and returns lease/online; scheduling belongs to the caller.";
 LicenseboxLease::usage="LicenseboxLease[client] checks protected access.";
 LicenseboxRequire::usage="LicenseboxRequire[client,module] checks module access.";
 LicenseboxStatus::usage="LicenseboxStatus[client] returns local verified status.";
@@ -80,6 +81,7 @@ call[c_Association,op_,args_:<||>]:=Module[{busy=Lookup[c,"Busy",None],state=Loo
  If[TrueQ[state[]],state[]=False;failure["callback_error"],result]
 ];
 LicenseboxLease[c_]:=call[c,"lease"];
+LicenseboxHeartbeat[c_,module_String]:=call[c,"heartbeat",<|"module"->module|>];
 LicenseboxRequire[c_,m_String]:=call[c,"require",<|"module"->m|>];
 LicenseboxStatus[c_]:=call[c,"status"];
 LicenseboxSignIn[c_,t_:0.]:=call[c,"sign_in",<|"timeout"->N[t]|>];

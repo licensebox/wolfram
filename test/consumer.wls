@@ -17,6 +17,8 @@ native=LicenseboxNativeBinding["demo"];assert[StringQ[native]&&StringStartsQ[nat
 c=LicenseboxOpen[<|"product"->"demo","keys"->vectors["keys"],"directory"->FileNameJoin[{package,"consumer-state"}]|>];
 assert[AssociationQ[c]&&JLink`JavaObjectQ[c["Object"]],"installed consumer must create real native client"];
 status=LicenseboxStatus[c];assert[FailureQ[status]&&status[[1]]==="not_signed_in","fresh installed status must refuse access"];
+heartbeat=LicenseboxHeartbeat[c,"core"];assert[MatchQ[heartbeat,Failure["not_signed_in",_Association]],"installed explicit heartbeat must refuse a missing lease without activation"];
 LicenseboxClose[c];LicenseboxClose[c];
+assert[MatchQ[LicenseboxHeartbeat[c,"core"],Failure["closed",_Association]],"closed installed heartbeat must refuse access"];
 assert[MatchQ[LicenseboxStatus[c],Failure["closed",_Association]],"closed installed client must refuse access"];
 Print["PASS: actual Wolfram installed-package consumer, real signatures, native helpers and lifecycle"];
