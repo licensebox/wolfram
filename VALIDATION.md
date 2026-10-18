@@ -70,19 +70,24 @@ were made during this validation, and no remote release/tag was published.
 
 ## Optional heartbeat candidate — 2026-10-18
 
-The separate `feature/heartbeat` branch additionally passes all **36 shared
-heartbeat cases** through actual Wolfram Engine 15/JLink/native execution. The
-complete 69-case suite was rerun successfully against the same corrected native
-C candidate `c530e36b4656d9a66cb1b01c977a84df1f458fc3`. The shared regression
-comes from protocol commit `e1f44de9fac558889e30e02bc033485917c7d0ce`;
-`conformance/heartbeat.py` has SHA256
-`d654e6be89d18f8b8b41f54b4472d134c365af77f723ad7de669ab447ee7f793`.
+The separate `feature/heartbeat` branch additionally passes all **37 shared
+heartbeat cases** through actual Wolfram Engine 15/JLink/native execution using
+native C candidate `b35aa2eca13f83f20681ec6083d996f7bcd86306`. This includes an
+HTTP 403 response whose body stalls: the client returns `http_error` and refuses
+access instead of accepting an offline fallback. The exact 37-case shared
+`conformance/heartbeat.py` source has SHA256
+`2f6b30d9155a3148d19a7890964a40f63399424b12b3ab4f21075161d17c1678`.
+
+The complete 69-case suite was previously rerun successfully against native C
+candidate `c530e36b4656d9a66cb1b01c977a84df1f458fc3`; that phase also passed
+the earlier 36-case heartbeat suite.
 
 The installed executable-package consumer also invokes the new public
 `LicenseboxHeartbeat` method and checks missing-lease and closed-client refusal.
 The existing runtime, package, callback, Unicode and TLS checks passed during
-candidate validation. Logs are retained locally as `build/logs/heartbeat.log`
-and `build/logs/conformance-c530e36.log`, with earlier 34-case evidence retained
+candidate validation. Logs are retained locally as `build/logs/heartbeat-37-b35aa2e.log`,
+`build/logs/heartbeat.log` and `build/logs/conformance-c530e36.log`, with earlier
+34-case evidence retained
 separately; no raw logs, tests or documentation are included in executable
 packages.
 

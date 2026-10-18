@@ -45,7 +45,7 @@ Access links, leases and private device codes are credentials; avoid logs. Keep 
 
 ## Validation
 
-Actual Wolfram Engine 15.0.0 on Linux x86-64 passes all 69 shared checks, TLS trust/hostname tests, the installed-package consumer, 100-client lifecycle checks, Unicode JSON roundtrips and real sign-in/cancellation callbacks. Each shared adapter request starts a fresh Wolfram process and executes the actual Wolfram API/JLink/native stack. The heartbeat feature candidate also passes all 36 shared heartbeat checks, including missing-identity refusal and HTTP redirect refusal. All fixtures and servers are synthetic; no production endpoint or private product data is used.
+Actual Wolfram Engine 15.0.0 on Linux x86-64 passes all 69 shared checks, TLS trust/hostname tests, the installed-package consumer, 100-client lifecycle checks, Unicode JSON roundtrips and real sign-in/cancellation callbacks. Each shared adapter request starts a fresh Wolfram process and executes the actual Wolfram API/JLink/native stack. The heartbeat feature candidate also passes all 37 shared heartbeat checks, including missing-identity refusal and HTTP redirect refusal. All fixtures and servers are synthetic; no production endpoint or private product data is used.
 
 The exact public protocol pin is protocol-lock.json; native-version.txt records the minimum C release. Follow [the shared contract](https://github.com/licensebox/protocol) before changing licensing behavior. Administration remains in the Go CLI.
 
