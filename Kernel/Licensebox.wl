@@ -17,19 +17,68 @@ LicenseboxVerifyLease::usage="LicenseboxVerifyLease[token,product,keys,now] veri
 Begin["`Private`"];
 Needs["JLink`"];
 $root=DirectoryName[DirectoryName[$InputFileName]];
-initialize[]:=(InstallJava[];AddToClassPath[FileNameJoin[{$root,"build","licensebox-wolfram.jar"}],FileNameJoin[{$root,"build","jna.jar"}],FileNameJoin[{$root,"build","gson.jar"}]];LoadJavaClass["dev.licensebox.WolframBridge"]);
-encode[x_]:=ExportString[x,"RawJSON","Compact"->True];
-unwrap[s_String]:=With[{a=ImportString[s,"RawJSON"]},If[TrueQ[a["ok"]],a["value"],Failure[a["error"],<|"MessageTemplate"->a["error"]|>]]];
-LicenseboxOpen[options_Association,callbacks_Association:<||>]:=Module[{symbols,proxy,obj,error,methods={"signIn","clock","binding","cancelled"},names={"on_sign_in","clock","machine_binding","cancelled"}},
- initialize[];symbols=Table[Unique["Licensebox`Private`callback$"],4];
- MapThread[Function[{symbol,key},With[{s=symbol,f=Lookup[callbacks,key,Function[Null]]},s[args___]:=f[args]]],{symbols,names}];
- proxy=ImplementJavaInterface["dev.licensebox.WolframBridge$Callbacks",MapThread[Rule,{methods,(Context[#]<>SymbolName[#])&/@symbols}]];
- obj=JavaNew["dev.licensebox.WolframBridge",encode[options],proxy,Sequence@@(KeyExistsQ[callbacks,#]&/@names)];
- If[!JavaObjectQ[obj],Scan[ClearAll,symbols];Return[Failure["native_error",<||>]]];error=obj@creationError[];
- If[error!="",ReleaseJavaObject[obj];ReleaseJavaObject[proxy];Scan[ClearAll,symbols];Return[Failure[error,<|"MessageTemplate"->error|>]]];<|"Object"->obj,"Proxy"->proxy,"Symbols"->symbols|>
+$initialized=False;
+failure[code_String]:=Failure[code,<|"MessageTemplate"->code|>];
+dependency[name_String,local_String,system_String]:=With[{configured=Environment[name]},Which[StringQ[configured]&&configured!="",configured,FileExistsQ[FileNameJoin[{$root,"build",local}]],FileNameJoin[{$root,"build",local}],True,system]];
+initialize[]:=Module[{jna,gson,bridge,link,loaded},
+ If[TrueQ[$initialized],Return[True]];
+ jna=dependency["JNA_JAR","jna.jar","/usr/share/java/jna.jar"];
+ gson=dependency["GSON_JAR","gson.jar","/usr/share/java/gson.jar"];
+ bridge=FileNameJoin[{$root,"build","licensebox-wolfram.jar"}];
+ If[!AllTrue[{jna,gson,bridge},FileExistsQ],Return[failure["native_dependency_missing"]]];
+ link=InstallJava[];If[Head[link]=!=LinkObject,Return[failure["java_unavailable"]]];
+ AddToClassPath[bridge,jna,gson];loaded=LoadJavaClass["dev.licensebox.WolframBridge"];
+ If[Head[loaded]=!=JavaClass,Return[failure["native_dependency_missing"]]];
+ (* J/Link proxy results require Boolean objects, retained once per JVM. *)
+ $trueObject=JavaNew["java.lang.Boolean",True];$falseObject=JavaNew["java.lang.Boolean",False];
+ If[!JavaObjectQ[$trueObject]||!JavaObjectQ[$falseObject],Return[failure["native_dependency_missing"]]];
+ $initialized=True;True
 ];
-LicenseboxClose[c_Association]:=(If[JavaObjectQ[c["Object"]],c["Object"]@close[];ReleaseJavaObject[c["Object"]]];If[JavaObjectQ[c["Proxy"]],ReleaseJavaObject[c["Proxy"]]];Scan[ClearAll,c["Symbols"]];Null);
-call[c_Association,op_,args_:<||>]:=unwrap[c["Object"]@call[op,encode[args]]];
+(* RawJSON uses UTF-8 byte strings; J/Link uses Unicode Java strings. *)
+encode[x_]:=FromCharacterCode[ToCharacterCode[ExportString[x,"RawJSON","Compact"->True]],"UTF8"];
+decode[s_String]:=ImportString[FromCharacterCode[ToCharacterCode[s,"UTF8"]],"RawJSON"];
+unwrap[s_String]:=Module[{a=Quiet[Check[decode[s],$Failed]]},If[!AssociationQ[a]||!KeyExistsQ[a,"ok"],Return[failure["protocol_error"]]];If[TrueQ[a["ok"]],Lookup[a,"value",Null],failure[Lookup[a,"error","protocol_error"]]]];
+unwrap[_]:=failure["native_error"];
+callbackDefault["cancelled"]:=Function[False];
+callbackDefault[_]:=Function[Null];
+callbackFallback["clock"]:=0.;callbackFallback["machine_binding"]:="";callbackFallback["cancelled"]:=$trueObject;callbackFallback[_]:=Null;
+invokeCallback[f_,key_String,args_List,state_Symbol]:=Module[{value,valid=True,completed=False},
+ If[TrueQ[state[]],Return[callbackFallback[key]]];
+ value=Catch[Catch[(value=CheckAbort[Quiet[Check[Apply[f,args],$Failed]],$Failed];completed=True;value),_,Function[{v,t},$Failed]]];
+ If[!TrueQ[completed]||value===$Failed,valid=False,
+  Switch[key,
+   "clock",value=Quiet[Check[N[value,MachinePrecision],$Failed]];valid=MachineNumberQ[value]&&TrueQ[Im[value]==0],
+   "machine_binding",valid=StringQ[value]&&StringFreeQ[value,FromCharacterCode[0]],
+   "cancelled",valid=MatchQ[value,True|False],
+   "on_sign_in",value=Null]];
+ If[!TrueQ[valid],state[]=True;callbackFallback[key],If[key==="cancelled",If[TrueQ[value],$trueObject,$falseObject],value]]
+];
+LicenseboxOpen[options_Association,callbacks_Association:<||>]:=Module[{symbols,proxy,obj,error,state,busy,ready,flags,methods={"signIn","clock","binding","cancelled"},names={"on_sign_in","clock","machine_binding","cancelled"}},
+ ready=initialize[];If[FailureQ[ready],Return[ready]];
+ If[!SubsetQ[names,Keys[callbacks]]||!AllTrue[Values[callbacks],MatchQ[#,_Function|_Symbol]&],Return[failure["invalid_argument"]]];
+ symbols=Table[Unique["Licensebox`Private`callback$"],4];state=Unique["Licensebox`Private`callbackState$"];busy=Unique["Licensebox`Private`busy$"];state[]=False;busy[]=False;
+ MapThread[Function[{symbol,key},With[{s=symbol,f=Lookup[callbacks,key,callbackDefault[key]],k=key,st=state},s[args___]:=invokeCallback[f,k,{args},st]]],{symbols,names}];
+ proxy=ImplementJavaInterface["dev.licensebox.WolframBridge$Callbacks",MapThread[Rule,{methods,(Context[#]<>SymbolName[#])&/@symbols}]];
+ flags=Append[KeyExistsQ[callbacks,#]&/@Take[names,3],True];
+ obj=Quiet[Check[JavaNew["dev.licensebox.WolframBridge",encode[options],proxy,Sequence@@flags],$Failed]];
+ If[!JavaObjectQ[obj],If[JavaObjectQ[proxy],ReleaseJavaObject[proxy]];Scan[ClearAll,Join[symbols,{state,busy}]];Return[failure["native_error"]]];
+ error=obj@creationError[];
+ If[error!="",ReleaseJavaObject[obj];ReleaseJavaObject[proxy];Scan[ClearAll,Join[symbols,{state,busy}]];Return[failure[error]]];
+ <|"Object"->obj,"Proxy"->proxy,"Symbols"->symbols,"CallbackState"->state,"Busy"->busy|>
+];
+LicenseboxClose[c_Association]:=Module[{busy=Lookup[c,"Busy",None]},
+ If[busy=!=None&&TrueQ[busy[]],Return[failure["invalid_argument"]]];
+ If[JavaObjectQ[c["Object"]],c["Object"]@close[];ReleaseJavaObject[c["Object"]]];
+ If[JavaObjectQ[c["Proxy"]],ReleaseJavaObject[c["Proxy"]]];
+ Scan[ClearAll,Join[c["Symbols"],{c["CallbackState"],c["Busy"]}]];Null
+];
+call[c_Association,op_,args_:<||>]:=Module[{busy=Lookup[c,"Busy",None],state=Lookup[c,"CallbackState",None],result},
+ If[!JavaObjectQ[c["Object"]],Return[failure["closed"]]];
+ If[busy===None||state===None,Return[failure["invalid_argument"]]];
+ If[TrueQ[busy[]],Return[failure["invalid_argument"]]];busy[]=True;
+ result=CheckAbort[Quiet[Check[unwrap[c["Object"]@call[op,encode[args]]],failure["native_error"]]],busy[]=False;Abort[]];busy[]=False;
+ If[TrueQ[state[]],state[]=False;failure["callback_error"],result]
+];
 LicenseboxLease[c_]:=call[c,"lease"];
 LicenseboxRequire[c_,m_String]:=call[c,"require",<|"module"->m|>];
 LicenseboxStatus[c_]:=call[c,"status"];
@@ -40,7 +89,7 @@ LicenseboxRequests[c_]:=call[c,"requests"];
 LicenseboxRequestAccess[c_,ms_List,note_String:""]:=call[c,"request",<|"modules"->ms,"note"->note|>];
 LicenseboxAccessLink[c_]:=call[c,"access-link"];
 LicenseboxRecord[c_,command_String,success:(True|False),elapsed_?NumericQ]:=call[c,"record",<|"command"->command,"success"->success,"elapsed"->N[elapsed]|>];
-LicenseboxDeriveBinding[p_String,s_String,raw_String]:=(initialize[];unwrap[WolframBridge`derive[p,s,raw]]);
-LicenseboxNativeBinding[p_String]:=(initialize[];unwrap[WolframBridge`nativeBinding[p]]);
-LicenseboxVerifyLease[t_String,p_String,keys_Association,now_?NumericQ]:=(initialize[];unwrap[WolframBridge`verify[t,p,encode[keys],N[now]]]);
+LicenseboxDeriveBinding[p_String,s_String,raw_String]:=Module[{ready=initialize[]},If[FailureQ[ready],ready,unwrap[WolframBridge`derive[p,s,raw]]]];
+LicenseboxNativeBinding[p_String]:=Module[{ready=initialize[]},If[FailureQ[ready],ready,unwrap[WolframBridge`nativeBinding[p]]]];
+LicenseboxVerifyLease[t_String,p_String,keys_Association,now_?NumericQ]:=Module[{ready=initialize[]},If[FailureQ[ready],ready,unwrap[WolframBridge`verify[t,p,encode[keys],N[now]]]]];
 End[];EndPackage[];

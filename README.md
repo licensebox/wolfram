@@ -1,25 +1,27 @@
 # Licensebox for Wolfram Language
 
-**Source preview — Wolfram runtime is unvalidated.** No versioned SDK release
-is published yet. Linux CI compiles and tests only the native Java bridge,
-including callback/lifetime behavior. Full Wolfram evaluation and shared
-licensing conformance still require a licensed runtime.
+**Source preview — Wolfram 15 on Linux is tested locally.** No versioned SDK
+release is published. The complete runtime suite passes on the activated local
+Wolfram Engine 15.0.0 installation; hosted GitHub CI currently validates only the
+Java native bridge. A repeatable licensed runtime job is required before stable
+release promotion. See [VALIDATION.md](VALIDATION.md) for exact evidence.
 
 Application licensing SDK by [Vijai Kumar](https://meshing.engineer). MIT, 2026.
 Uses the maintained Licensebox C core **>=0.3.0** for HTTPS, pure Ed25519 verification, native machine identity, persistence, activation, offline access, policy refusals and bounded usage collection. No licensing server or administration credentials are included.
 
 ## Build and install
 
-A licensed Wolfram runtime with J/Link, Java >=17, JNA >=5.18 and Gson. The included Java native bridge is built by javac; the Wolfram API and callbacks require Wolfram itself.
+An activated Wolfram runtime with J/Link, Java 21, JNA and Gson. The tested versions are Wolfram Engine 15.0.0, OpenJDK 21, JNA 5.18.1 and Gson 2.13.2. Other runtime versions are unvalidated.
 Build/install the public [C core](https://github.com/licensebox/c) as a shared library first. Export `LICENSEBOX_LIB_DIR` (directory containing liblicensebox.so), `LICENSEBOX_INCLUDE_DIR` (public headers), and `LD_LIBRARY_PATH`. `LICENSEBOX_LIBRARY` may identify the library path; scripts derive its containing directory when supplied. Linked bindings resolve liblicensebox.so through the native dynamic loader, so use a compatible library basename. CI uses only a disposable Ubuntu runner; ci/setup.sh is not a workstation installer.
 
 ```sh
-bash ci/setup.sh
-bash ci/test.sh
-python3 ../protocol/conformance/run.py --adapter bash ci/adapter.sh
+# ci/setup.sh is optional disposable-runner dependency setup, not host activation.
+export JNA_JAR=/path/to/jna.jar
+export GSON_JAR=/path/to/gson.jar
+bash ci/full-test.sh
 ```
 
-`ci/test.sh` builds real language code and runs repeated allocation/close checks, then creates or installs the language package. The adapter is test-only and supplies synthetic clock/binding callbacks. It is not a production command-line bypass.
+`ci/test.sh` builds real language code, checks callback/lifetime behavior, and tests a consumer installed from the executable SDK package. `ci/full-test.sh` additionally runs the unchanged 69-case shared suite and real loopback TLS tests. Neither script activates Wolfram or changes accounts/licenses. Set `LICENSEBOX_PROTOCOL_DIR` if the shared protocol checkout is not adjacent. Artifacts contain only executable `Kernel/Licensebox.wl`, `build/licensebox-wolfram.jar`, and `LICENSE`; JNA/Gson are separate dependencies selected by `JNA_JAR` and `GSON_JAR`. The adapter is test-only and supplies synthetic clock/binding callbacks. It is not a production command-line bypass.
 
 ## Use
 
@@ -43,11 +45,11 @@ Access links, leases and private device codes are credentials; avoid logs. Keep 
 
 ## Validation
 
-The Wolfram runtime is unavailable in the development environment. The Java bridge compiles, but Wolfram evaluation, J/Link callbacks, lifetime and protocol conformance are **unvalidated**; run the commands below on a licensed runner before release.
+Actual Wolfram Engine 15.0.0 on Linux x86-64 passes all 69 shared checks, TLS trust/hostname tests, the installed-package consumer, 100-client lifecycle checks, Unicode JSON roundtrips and real sign-in/cancellation callbacks. Each shared adapter request starts a fresh Wolfram process and executes the actual Wolfram API/JLink/native stack. All fixtures and servers are synthetic; no production endpoint or private product data is used.
 
 The exact public protocol pin is protocol-lock.json; native-version.txt records the minimum C release. Follow [the shared contract](https://github.com/licensebox/protocol) before changing licensing behavior. Administration remains in the Go CLI.
 
 The scheduled update workflow tests only the bridge before proposing native
-dependency/contract updates. Its PRs explicitly retain the runtime-unvalidated
-status. Run `ci/test.sh` and the full shared suite with a licensed Wolfram runtime
-before promoting this preview to a released SDK.
+dependency/contract updates. Its PRs retain the bridge-only validation profile; they do not prove a new dependency passes Wolfram runtime checks. Run `ci/full-test.sh` on an already activated runner before promoting any preview/dependency update to a released SDK.
+
+The [official Wolfram CI template](https://github.com/WolframResearch/WL-FunctionCompile-CI-Template#2-create-an-on-demand-license-entitlement) uses an on-demand licensing entitlement stored as a repository secret, or a licensed self-hosted/MathLM setup. A public repository alone does not provide automatic Wolfram activation. This project has not configured a licensed hosted runtime job and does not copy local activation files or credentials into the repository.

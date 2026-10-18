@@ -12,3 +12,7 @@ build/
 dist-newstyle/
 *.mex*
 *.d
+
+# Python test bytecode is never SDK source.
+__pycache__/
+*.py[cod]
