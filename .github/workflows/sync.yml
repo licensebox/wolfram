@@ -23,7 +23,7 @@ jobs:
   test:
     needs: discover
     if: needs.discover.outputs.changed == 'true'
-    uses: licensebox/protocol/.github/workflows/preview.yml@732f7230fc7364da14ff681f2ab2867d818f668d
+    uses: licensebox/protocol/.github/workflows/preview.yml@1bfdfb756c07323a74fa5b5a68c447a1fdb17be0
     with:
       language: wolfram
       protocol_ref: ${{ needs.discover.outputs.ref }}
