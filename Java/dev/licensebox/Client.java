@@ -18,6 +18,8 @@ public class Client implements AutoCloseable {
     }
     public static class Config {
         public String product,version="",server,directory,caBundle;
+        /** A service account's one-time enrolment token; null reads LICENSEBOX_ENROL_TOKEN. */
+        public String enrolToken;
         public Map<String,String> keys=new LinkedHashMap<>();
         public BiConsumer<String,String> onSignIn;
         public BooleanSupplier cancelled;
@@ -78,6 +80,7 @@ public class Client implements AutoCloseable {
         if(cfg.server!=null)options.addProperty("server",argument(cfg.server));
         if(cfg.directory!=null)options.addProperty("directory",argument(cfg.directory));
         if(cfg.caBundle!=null)options.addProperty("ca_bundle",argument(cfg.caBundle));
+        if(cfg.enrolToken!=null)options.addProperty("enrol_token",argument(cfg.enrolToken));
         state=new State(cfg);PointerByReference out=new PointerByReference();
         int result=NativeApi.API.lb_client_create_json(options.toString(),state.callbacks,out);
         Reference.reachabilityFence(state);
@@ -121,6 +124,12 @@ public class Client implements AutoCloseable {
     public JsonElement modules(){return call("modules",new JsonObject());}
     public JsonElement requests(){return call("requests",new JsonObject());}
     public JsonElement requestAccess(List<String> modules,String note){JsonObject args=new JsonObject();JsonArray names=new JsonArray();modules.forEach(value->names.add(argument(value)));args.add("modules",names);args.addProperty("note",argument(note));return call("request",args);}
+    /** Enrols this machine as a service account with a one-time token. */
+    public JsonElement enrol(String token){JsonObject args=new JsonObject();args.addProperty("token",argument(token));return call("enrol",args);}
+    /** Checks a floating copy of the module out; require does so by itself. */
+    public JsonElement checkout(String module){JsonObject args=new JsonObject();args.addProperty("module",argument(module));return call("checkout",args);}
+    /** Returns floating copies of the modules, or every copy with none named. */
+    public void checkin(String... modules){JsonObject args=new JsonObject();JsonArray names=new JsonArray();for(String m:modules)names.add(argument(m));args.add("modules",names);call("checkin",args);}
     public String accessLink(){return call("access-link",new JsonObject()).getAsString();}
     public void record(String command,boolean success,double elapsed){if(!Double.isFinite(elapsed)||elapsed<0)throw new IllegalArgumentException("invalid elapsed time");JsonObject args=new JsonObject();args.addProperty("command",argument(command));args.addProperty("success",success);args.addProperty("elapsed",elapsed);call("record",args);}
     @Override public synchronized void close(){if(busy)throw new IllegalStateException("callbacks must not reenter the client");cleanable.clean();}
